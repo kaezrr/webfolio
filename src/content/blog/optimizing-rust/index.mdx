@@ -1,0 +1,55 @@
+---
+title: 'Optimizing Rust Performance Through Compilation Settings'
+description: 'Exploring Rust compiler flags and build configurations to squeeze every bit of performance out of my PlayStation emulator without changing a single line of code.'
+date: 2025-02-07
+tags: ['playstation', 'rust', 'emulators', 'optimization', 'performance']
+draft: false
+---
+
+## Introduction
+
+I've been writing a PlayStation emulator in Rust for a while now called [starpsx](https://github.com/kaezrr/starpsx).
+
+## Runtime Optimizations Through Compiler Configuration
+
+I've been doing some runtime optimizations by changing how I compile my code. Here's my report:
+
+**Note:** These are by no means an accurate nor comprehensive benchmark. I'm just using a heavy scene that my emulator struggles on.
+
+All the changes are cumulative:
+
+- Default release = 29fps
+- `+ codegen-units = 1{:toml}` = 33fps
+- `+ lto = "fat"{:toml}` = 37fps
+- `+ rustflag target-cpu=native{:toml}` = 52fps
+
+Binary size is 10MB right now, so let's try to optimize it:
+
+- `+ panic = "abort"{:toml}` = 52fps, 9.16MiB
+- `+ strip = "symbols"{:toml}` = 52fps, 8.34MiB
+
+Let's see what the `cargo clean{:sh}` compile time is with all this stuff:
+
+```console
+Finished `release` profile [optimized] target(s) in 1m 16s
+```
+
+Not good, not terrible. Let's see if we can improve it.
+
+I've heard good things about the "wild" linker, so let's see how it does:
+
+```console
+Finished `release` profile [optimized] target(s) in 1m 14s
+```
+
+Hmm, well that didn't do much. Within margin of error, I would say.
+
+Let's try the experimental parallel front-end `"threads=8"{:toml}`:
+
+```console
+Finished `release` profile [optimized] target(s) in 1m 15s
+```
+
+RIP. I think `codegen-units = 1{:toml}` might be nullifying the parallelism... I could use the cranelift backend but that would affect runtime performance.
+
+I also want to explore <abbr title="Profile-Guided Optimization">PGO</abbr> sometime in the future, but overall I think these are all good results—around a 52% increase in runtime performance without changing a single line of code.
